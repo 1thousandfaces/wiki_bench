@@ -1,0 +1,42 @@
+{
+  "agent_name": "LLM-anthropic:claude-4-sonnet-20250514",
+  "target_page": "Kevin Bacon",
+  "target_url": "https://en.wikipedia.org/wiki/Kevin_Bacon",
+  "total_trials": 1,
+  "successful_trials": 1,
+  "success_rate": 100.0,
+  "gave_up_count": 0,
+  "cheated_count": 0,
+  "invalid_path_count": 1,
+  "average_score": 22.0,
+  "best_score": 22,
+  "worst_score": 22,
+  "average_path_length": 12.0,
+  "results": [
+    {
+      "start_page": "Bradawl",
+      "path": [
+        "Tool",
+        "Woodworking",
+        "Carpentry",
+        "Construction",
+        "Building",
+        "Architecture",
+        "Art",
+        "Film",
+        "Cinema of the United States",
+        "Hollywood",
+        "Actor",
+        "Kevin Bacon"
+      ],
+      "score": 22,
+      "success": true,
+      "gave_up": false,
+      "cheated": false,
+      "invalid_path": true,
+      "time_taken": 9.642490863800049,
+      "error_message": null,
+      "raw_response": "Tool\nWoodworking\nCarpentry\nConstruction\nBuilding\nArchitecture\nArt\nFilm\nCinema of the United States\nHollywood\nActor\nKevin Bacon"
+    }
+  ]
+}

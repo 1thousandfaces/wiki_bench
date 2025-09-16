@@ -1,0 +1,29 @@
+{
+  "agent_name": "LLM-anthropic:claude-4-sonnet-latest",
+  "target_page": "Kevin Bacon",
+  "target_url": "https://en.wikipedia.org/wiki/Kevin_Bacon",
+  "total_trials": 1,
+  "successful_trials": 0,
+  "success_rate": 0.0,
+  "gave_up_count": 1,
+  "cheated_count": 0,
+  "invalid_path_count": 0,
+  "average_score": 15.0,
+  "best_score": 15,
+  "worst_score": 15,
+  "average_path_length": 0,
+  "results": [
+    {
+      "start_page": "Bradawl",
+      "path": [],
+      "score": 15,
+      "success": false,
+      "gave_up": true,
+      "cheated": false,
+      "invalid_path": false,
+      "time_taken": 0.19649791717529297,
+      "error_message": null,
+      "raw_response": null
+    }
+  ]
+}

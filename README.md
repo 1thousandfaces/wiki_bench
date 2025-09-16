@@ -202,7 +202,7 @@ Scoring:
 - Creative connection bonus exists in code but is unused by default (0).
 
 LLM notes:
-- `--llm <provider:model>` uses a multipurpose chat agent. In `tool_use` it returns an empty path (GAVE UP) because chat-only APIs cannot browse; this matches the article’s evaluation framing. In `no_tool_use`, it asks the model to propose a conceptual path.
+- `--llm <provider:model>` uses a multipurpose chat agent. It asks the model for a conceptual path in both modes; in `tool_use` that path is treated as the candidate path and validated via live Wikipedia links (so it may often be marked invalid if any hop isn’t actually present).
 - Providers supported: `openai`, `anthropic`, `openrouter`, `kimi` (Moonshot). Set the appropriate API key env var:
   - OpenAI: `OPENAI_API_KEY`
   - Anthropic: `ANTHROPIC_API_KEY`
@@ -238,10 +238,10 @@ python run_evaluation.py \
   --start-page "Bradawl" \
   --start-url "https://en.wikipedia.org/wiki/Bradawl"
 
-LLM chat evaluations (article-style):
+LLM chat evaluations (conceptual path validated in tool_use):
 
 ```bash
-# OpenAI example (tool_use returns GAVE UP because chat models cannot browse)
+# OpenAI example (tool_use validates the model's conceptual path via live links)
 python run_evaluation.py --llm openai:gpt-4o-mini --mode tool_use --trials 1 --start-page "Bradawl" --target-page "Kevin Bacon"
 
 # OpenRouter + Anthropic example

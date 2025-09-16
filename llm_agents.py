@@ -54,7 +54,25 @@ class LLMChatAgent(AIAgent):
         self.model = model
         self.target_page = os.getenv("WIKIBENCH_TARGET_PAGE", "Kevin Bacon")
         self._client = None
+        # Normalize model aliases for certain providers
+        self._normalize_model_aliases()
         self._init_client()
+
+    def _normalize_model_aliases(self):
+        if self.provider == "anthropic":
+            # Accept common shorthand/alias forms and map to official Anthropic IDs
+            # e.g., "claude-3-5-sonnet" -> "claude-3-5-sonnet-20240620"
+            m = self.model.replace("/", ":").replace("3.5", "3-5").lower()
+            # Keep the original if it's already a full ID
+            aliases = {
+                "claude-3-5-sonnet": "claude-3-5-sonnet-20240620",
+                "claude-3-5-sonnet-latest": "claude-3-5-sonnet-latest",
+                "claude-3-opus": "claude-3-opus-20240229",
+                "claude-3-sonnet": "claude-3-sonnet-20240229",
+                "claude-3-haiku": "claude-3-haiku-20240307",
+            }
+            if m in aliases:
+                self.model = aliases[m]
 
     def _init_client(self):
         if self.provider == "openai":
@@ -81,20 +99,16 @@ class LLMChatAgent(AIAgent):
     def _create_prompt(self, start_page: str) -> str:
         tgt = self.target_page
         return (
-            f"You are tasked with finding a path from the Wikipedia page \"{start_page}\" "
-            f"to the Wikipedia page \"{tgt}\" by following Wikipedia links.\n\n"
+            f"Find a path from the Wikipedia page \"{start_page}\" to \"{tgt}\" by following only on‑wiki links.\n\n"
             f"Starting page: {start_page}\nTarget page: {tgt}\n\n"
-            "Your goal is to list Wikipedia page titles you would traverse, in order, "
-            "to reach the target.\n"
-            "Rules:\n"
-            "1) Each listed title must be a real Wikipedia page\n"
-            "2) Each page must be reachable from the previous one via a link\n"
-            "3) Keep the path short\n"
-            "4) Do not use external search engines or direct jumps\n\n"
-            "Return only the list of page titles, one per line, ending with the target.\n"
+            "Output format (strict):\n"
+            "- Only the list of Wikipedia page titles, one per line\n"
+            "- Do NOT include the starting page in your list\n"
+            "- The last line MUST be the target page\n"
+            "- No bullets, numbers, dashes, or commentary\n"
         )
 
-    def _extract_path(self, text: str) -> List[str]:
+    def _extract_path(self, text: str, start_page: str) -> List[str]:
         lines = text.strip().splitlines()
         path: List[str] = []
         for line in lines:
@@ -103,14 +117,49 @@ class LLMChatAgent(AIAgent):
                 continue
             # Drop bullets / numbering / prefixes
             s = re.sub(r"^\s*[-*\d\.]+\s*", "", s)
+            # Strip surrounding quotes
+            s = s.strip('"').strip("'")
+            # Skip leading commentary lines
             if s.lower().startswith(("here", "path", "the path")):
                 continue
+            # Skip explicit repeats of the starting page
+            if s.lower() == start_page.lower():
+                continue
+            # Drop blank after cleaning
+            if not s:
+                continue
             path.append(s)
+        # If the model forgot to include the target as the last line, append if present elsewhere
+        if path and path[-1].lower() != self.target_page.lower():
+            # If target appears somewhere, move it to the end; otherwise, append it
+            lowered = [p.lower() for p in path]
+            if self.target_page.lower() in lowered:
+                first_idx = lowered.index(self.target_page.lower())
+                # Keep everything up to that idx, then ensure target last
+                path = path[: first_idx + 1]
+            else:
+                path.append(self.target_page)
+
+        # Fallback: arrow-separated single-line format
+        if not path and ("->" in text or "→" in text):
+            pieces = re.split(r"\s*(?:->|→)\s*", text)
+            for p in pieces:
+                p = p.strip().strip('"').strip("'")
+                if not p:
+                    continue
+                if p.lower() == start_page.lower():
+                    continue
+                # Heuristic: skip commentary chunks
+                if len(p.split()) > 7:
+                    continue
+                path.append(p)
+            if path and path[-1].lower() != self.target_page.lower():
+                path.append(self.target_page)
         return path
 
     def solve_wikibench(self, start_page: str, start_url: str, mode: EvaluationMode) -> List[str]:
-        # Always ask the model for a conceptual path so we can print its response,
-        # even when running in tool_use (where we still return GAVE UP).
+        # Always ask the model for a conceptual path so we can print its response
+        # and, in both modes, parse a path from it.
         prompt = self._create_prompt(start_page)
 
         self.last_response_text = None
@@ -130,9 +179,8 @@ class LLMChatAgent(AIAgent):
                         parts.append(block.get("text", ""))
                 text = "\n".join(parts)
                 self.last_response_text = text
-                if mode == EvaluationMode.NO_TOOL_USE:
-                    return self._extract_path(text)
-                return []
+                parsed = self._extract_path(text, start_page)
+                return parsed
             else:
                 resp = self._client.chat.completions.create(
                     model=self.model,
@@ -142,9 +190,8 @@ class LLMChatAgent(AIAgent):
                 )
                 text = resp.choices[0].message.content
                 self.last_response_text = text
-                if mode == EvaluationMode.NO_TOOL_USE:
-                    return self._extract_path(text)
-                return []
+                parsed = self._extract_path(text, start_page)
+                return parsed
         except Exception as e:
             print(f"LLM error ({self.provider}:{self.model}): {e}")
             return []
