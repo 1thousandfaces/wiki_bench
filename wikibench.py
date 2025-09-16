@@ -1,5 +1,5 @@
 """
-WikiBench: A benchmark for testing AI agents' ability to navigate from random Wikipedia pages to Kevin Bacon's page.
+WikiBench: A benchmark for testing AI agents' ability to navigate from random Wikipedia pages to a target page (default: Kevin Bacon).
 
 Based on the article: https://1thousandfaces.substack.com/p/wikibench-76-of-sota-models-fail
 """
@@ -37,6 +37,7 @@ class WikiBenchResult:
     creative_connections: int = 0
     time_taken: float = 0.0
     error_message: Optional[str] = None
+    raw_response: Optional[str] = None
     
     def __post_init__(self):
         if self.path is None:
@@ -157,7 +158,7 @@ class AIAgent(ABC):
             mode: Evaluation mode (tool use or no tool use)
             
         Returns:
-            List of page titles representing the path to Kevin Bacon
+            List of page titles representing the path to the target page
         """
         pass
     
@@ -170,9 +171,12 @@ class AIAgent(ABC):
 class WikiBenchEvaluator:
     """Main evaluation harness for WikiBench"""
     
-    def __init__(self):
+    def __init__(self, target_page: str = "Kevin Bacon", target_url: Optional[str] = None):
         self.navigator = WikipediaNavigator()
         self.scorer = WikiBenchScorer()
+        self.target_page = target_page
+        # Derive target URL if not provided
+        self.target_url = target_url or f"https://en.wikipedia.org/wiki/{target_page.replace(' ', '_')}"
     
     def run_single_evaluation(self, agent: AIAgent, mode: EvaluationMode, 
                             start_page: Optional[str] = None, 
@@ -185,7 +189,9 @@ class WikiBenchEvaluator:
         
         result = WikiBenchResult(
             start_page=start_page,
-            start_url=start_url
+            start_url=start_url,
+            target_page=self.target_page,
+            target_url=self.target_url,
         )
         
         try:
@@ -193,12 +199,16 @@ class WikiBenchEvaluator:
             
             # Get path from agent
             path = agent.solve_wikibench(start_page, start_url, mode)
+            # Capture any raw response text from LLM-like agents
+            raw = getattr(agent, 'last_response_text', None)
+            if raw:
+                result.raw_response = raw
             
             result.time_taken = time.time() - start_time
             result.path = path if path else []
             
-            # Check for cheating (direct jump to Kevin Bacon without valid path)
-            if len(result.path) == 1 and result.path[0] == "Kevin Bacon":
+            # Check for cheating (direct jump to target without valid path)
+            if len(result.path) == 1 and result.path[0] == self.target_page:
                 result.cheated = True
             
             # Check if gave up (empty path or explicit indication)
@@ -212,7 +222,7 @@ class WikiBenchEvaluator:
             
             # Check success
             if result.path and not result.gave_up and not result.cheated:
-                result.success = self.navigator.check_if_reached_target(result.path[-1])
+                result.success = self.navigator.check_if_reached_target(result.path[-1], self.target_page)
             
             # Calculate score
             result.score = self.scorer.calculate_score(result)
@@ -255,6 +265,8 @@ class WikiBenchEvaluator:
         
         report = {
             "agent_name": agent_name,
+            "target_page": self.target_page,
+            "target_url": self.target_url,
             "total_trials": total_trials,
             "successful_trials": successful_trials,
             "success_rate": successful_trials / total_trials * 100,
@@ -275,7 +287,8 @@ class WikiBenchEvaluator:
                     "cheated": r.cheated,
                     "invalid_path": r.invalid_path,
                     "time_taken": r.time_taken,
-                    "error_message": r.error_message
+                    "error_message": r.error_message,
+                    "raw_response": r.raw_response
                 }
                 for r in results
             ]

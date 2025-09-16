@@ -14,6 +14,7 @@ class OpenAIAgent(AIAgent):
     def __init__(self, model: str = "gpt-4", api_key: str = None):
         self.model = model
         self.client = openai.OpenAI(api_key=api_key or os.getenv("OPENAI_API_KEY"))
+        self.target_page = os.getenv("WIKIBENCH_TARGET_PAGE", "Kevin Bacon")
     
     def solve_wikibench(self, start_page: str, start_url: str, mode: EvaluationMode) -> List[str]:
         if mode == EvaluationMode.TOOL_USE:
@@ -40,12 +41,13 @@ class OpenAIAgent(AIAgent):
     
     def _create_prompt(self, start_page: str) -> str:
         """Create the prompt for the WikiBench task"""
-        return f"""You are tasked with finding a path from the Wikipedia page "{start_page}" to the Wikipedia page "Kevin Bacon" by following Wikipedia links.
+        target = self.target_page
+        return f"""You are tasked with finding a path from the Wikipedia page "{start_page}" to the Wikipedia page "{target}" by following Wikipedia links.
 
 Starting page: {start_page}
-Target page: Kevin Bacon
+Target page: {target}
 
-Your goal is to identify a sequence of Wikipedia page titles that would allow you to navigate from the starting page to Kevin Bacon's page by clicking on links. You should think about logical connections between topics.
+Your goal is to identify a sequence of Wikipedia page titles that would allow you to navigate from the starting page to {target}'s page by clicking on links. You should think about logical connections between topics.
 
 Important rules:
 1. Each page in your path must be a real Wikipedia page
@@ -54,13 +56,13 @@ Important rules:
 4. Do not use external search engines or direct jumps
 5. Think about conceptual connections (geography, profession, time period, etc.)
 
-Please provide your answer as a simple list of Wikipedia page titles, one per line, representing the path from "{start_page}" to "Kevin Bacon". Do not include the starting page or explanations, just the intermediate pages and the final target.
+Please provide your answer as a simple list of Wikipedia page titles, one per line, representing the path from "{start_page}" to "{target}". Do not include the starting page or explanations, just the intermediate pages and the final target.
 
 Example format:
 Page 1
 Page 2  
 Page 3
-Kevin Bacon"""
+{target}"""
     
     def _extract_path_from_response(self, response_text: str) -> List[str]:
         """Extract the path from the model's response"""
@@ -88,7 +90,7 @@ Kevin Bacon"""
 
 
 if __name__ == "__main__":
-    # Example: Test the bradawl → Kevin Bacon path from the article
+    # Example: Test the bradawl → target path from the article
     
     # You'll need to set your OpenAI API key
     # export OPENAI_API_KEY="your-api-key-here"
@@ -99,7 +101,8 @@ if __name__ == "__main__":
     start_page = "bradawl"
     start_url = "https://en.wikipedia.org/wiki/Bradawl"
     
-    print(f"Testing path from '{start_page}' to 'Kevin Bacon'")
+    target = agent.target_page
+    print(f"Testing path from '{start_page}' to '{target}'")
     path = agent.solve_wikibench(start_page, start_url, EvaluationMode.NO_TOOL_USE)
     
     print(f"\nProposed path:")

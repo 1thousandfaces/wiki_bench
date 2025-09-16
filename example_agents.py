@@ -6,6 +6,7 @@ These demonstrate how to implement the AIAgent interface.
 from wikibench import AIAgent, EvaluationMode, WikipediaNavigator
 from typing import List
 import random
+import os
 
 
 class RandomAgent(AIAgent):
@@ -14,13 +15,14 @@ class RandomAgent(AIAgent):
     def __init__(self, max_steps: int = 10):
         self.max_steps = max_steps
         self.navigator = WikipediaNavigator()
+        self.target_page = os.getenv("WIKIBENCH_TARGET_PAGE", "Kevin Bacon")
     
     def solve_wikibench(self, start_page: str, start_url: str, mode: EvaluationMode) -> List[str]:
         if mode == EvaluationMode.NO_TOOL_USE:
             # Just return a random conceptual path
             possible_connections = [
-                "Actor", "Film", "Hollywood", "Kevin Bacon",
-                "Celebrity", "Movie", "Entertainment", "Kevin Bacon"
+                "Actor", "Film", "Hollywood", self.target_page,
+                "Celebrity", "Movie", "Entertainment", self.target_page
             ]
             path_length = random.randint(2, 6)
             return random.choices(possible_connections, k=path_length)
@@ -35,10 +37,10 @@ class RandomAgent(AIAgent):
                     if not links:
                         break
                     
-                    # Check if Kevin Bacon is in the links
+                    # Check if target page is in the links
                     for title, url in links:
-                        if "Kevin Bacon" in title:
-                            path.append("Kevin Bacon")
+                        if self.target_page in title:
+                            path.append(self.target_page)
                             return path
                     
                     # Otherwise pick a random link
@@ -61,6 +63,7 @@ class GreedyActorAgent(AIAgent):
     def __init__(self, max_steps: int = 15):
         self.max_steps = max_steps
         self.navigator = WikipediaNavigator()
+        self.target_page = os.getenv("WIKIBENCH_TARGET_PAGE", "Kevin Bacon")
         self.actor_keywords = [
             "actor", "actress", "film", "movie", "cinema", "hollywood", 
             "director", "producer", "celebrity", "star", "entertainment",
@@ -74,7 +77,7 @@ class GreedyActorAgent(AIAgent):
                 "Entertainment industry", 
                 "American actor", 
                 "Hollywood",
-                "Kevin Bacon"
+                self.target_page
             ]
         
         else:  # TOOL_USE mode
@@ -87,10 +90,10 @@ class GreedyActorAgent(AIAgent):
                     if not links:
                         break
                     
-                    # Check if Kevin Bacon is directly available
+                    # Check if target page is directly available
                     for title, url in links:
-                        if "Kevin Bacon" in title:
-                            path.append("Kevin Bacon")
+                        if self.target_page in title:
+                            path.append(self.target_page)
                             return path
                     
                     # Score links based on actor/entertainment relevance
@@ -103,7 +106,7 @@ class GreedyActorAgent(AIAgent):
                             if keyword in title_lower:
                                 score += 1
                         
-                        # Bonus for American/English content (more likely to connect to Kevin Bacon)
+                        # Bonus for American/English content (often relevant to entertainment topics)
                         if any(word in title_lower for word in ["american", "english", "british", "united states"]):
                             score += 2
                         
@@ -132,12 +135,13 @@ class GreedyActorAgent(AIAgent):
 
 
 class HeuristicAgent(AIAgent):
-    """An agent that uses multiple heuristics to navigate toward Kevin Bacon"""
+    """An agent that uses multiple heuristics to navigate toward the target page"""
     
     def __init__(self, max_steps: int = 20):
         self.max_steps = max_steps
         self.navigator = WikipediaNavigator()
         self.visited_pages = set()
+        self.target_page = os.getenv("WIKIBENCH_TARGET_PAGE", "Kevin Bacon")
     
     def solve_wikibench(self, start_page: str, start_url: str, mode: EvaluationMode) -> List[str]:
         self.visited_pages = {start_page}  # Reset for each evaluation
@@ -149,7 +153,7 @@ class HeuristicAgent(AIAgent):
                 "American cinema", 
                 "Hollywood",
                 "American actor",
-                "Kevin Bacon"
+                self.target_page
             ]
         
         else:  # TOOL_USE mode
@@ -162,10 +166,10 @@ class HeuristicAgent(AIAgent):
                     if not links:
                         break
                     
-                    # Check if Kevin Bacon is directly available
+                    # Check if target page is directly available
                     for title, url in links:
-                        if "Kevin Bacon" in title:
-                            path.append("Kevin Bacon")
+                        if self.target_page in title:
+                            path.append(self.target_page)
                             return path
                     
                     # Apply heuristics to score links
@@ -199,8 +203,10 @@ class HeuristicAgent(AIAgent):
         """Select the best link using multiple heuristics"""
         
         # High-value target terms (in order of preference)
+        target_lower = self.target_page.lower()
+        target_tail = self.target_page.split()[-1].lower()
         high_value_terms = [
-            ["kevin bacon", "bacon"],  # Direct target
+            [target_lower, target_tail],  # Direct target (full name + last token)
             ["actor", "actress", "performer"],  # Acting profession
             ["film", "movie", "cinema"],  # Film industry
             ["american", "united states", "usa"],  # Geographic relevance
@@ -249,11 +255,12 @@ class HeuristicAgent(AIAgent):
 
 
 class CheatAgent(AIAgent):
-    """An agent that attempts to cheat by jumping directly to Kevin Bacon"""
+    """An agent that attempts to cheat by jumping directly to the target page"""
     
     def solve_wikibench(self, start_page: str, start_url: str, mode: EvaluationMode) -> List[str]:
-        # Always tries to cheat by going directly to Kevin Bacon
-        return ["Kevin Bacon"]
+        # Always tries to cheat by going directly to the target page
+        target_page = os.getenv("WIKIBENCH_TARGET_PAGE", "Kevin Bacon")
+        return [target_page]
     
     def get_name(self) -> str:
         return "CheatAgent"
